@@ -43,11 +43,11 @@ class Monitoring extends Model
 
     public function fotoMonitoring(): HasMany
     {
-    return $this->hasMany(FotoMonitoring::class);
+        return $this->hasMany(FotoMonitoring::class);
     }
 
     public function approval(): HasMany
     {
-    return $this->hasMany(Approval::class);
+        return $this->hasMany(Approval::class);
     }
 }
