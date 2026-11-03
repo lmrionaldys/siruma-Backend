@@ -8,6 +8,7 @@ use App\Http\Controllers\BlokController;
 use App\Http\Controllers\PenilaianController;
 use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\FotoMonitoringController;
+use App\Http\Controllers\ApprovalController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])
@@ -30,6 +31,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/penilaian', [PenilaianController::class, 'store']);
     Route::get('/monitoring/{id}/foto',[FotoMonitoringController::class, 'index']);
     Route::post('/monitoring/{id}/foto',[FotoMonitoringController::class, 'store']);
+    Route::get('/approval', [ApprovalController::class, 'index']);
+    Route::get('/approval/{id}', [ApprovalController::class, 'show']);
+    Route::post('/monitoring/{id}/ajukan', [MonitoringController::class,'submit',]);
+    Route::post('/approval/{id}/setujui', [ApprovalController::class,'approve',]);
+    Route::post('/approval/{id}/tolak', [ApprovalController::class,'reject',]);
 });
-
-

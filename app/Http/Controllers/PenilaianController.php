@@ -3,15 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Models\Penilaian;
+use App\Models\Monitoring;
 use Illuminate\Http\Request;
 
 class PenilaianController extends Controller
 {
-    public function index()
+    // Menampilkan daftar penilaian sesuai role
+    public function index(Request $request)
     {
-        $penilaian = Penilaian::with('monitoring.unit.blok.perumahan')
-            ->latest()
-            ->get();
+        $user = $request->user();
+
+        if (!in_array($user->role_id, [1, 2, 3])) {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses.'
+            ], 403);
+        }
+
+        $query = Penilaian::with(
+            'monitoring.unit.blok.perumahan'
+        );
+
+        // User hanya melihat penilaian miliknya
+        if ($user->role_id == 1) {
+            $query->whereHas('monitoring', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            });
+        }
+
+        $penilaian = $query->latest()->get();
 
         return response()->json([
             'message' => 'Daftar penilaian berhasil diambil.',
@@ -19,10 +38,29 @@ class PenilaianController extends Controller
         ]);
     }
 
-    public function show($id)
+    // Menampilkan detail penilaian
+    public function show(Request $request, $id)
     {
-        $penilaian = Penilaian::with('monitoring.unit.blok.perumahan')
-            ->findOrFail($id);
+        $user = $request->user();
+
+        if (!in_array($user->role_id, [1, 2, 3])) {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses.'
+            ], 403);
+        }
+
+        $query = Penilaian::with(
+            'monitoring.unit.blok.perumahan'
+        );
+
+        // Batasi User pada data miliknya sendiri
+        if ($user->role_id == 1) {
+            $query->whereHas('monitoring', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            });
+        }
+
+        $penilaian = $query->findOrFail($id);
 
         return response()->json([
             'message' => 'Detail penilaian berhasil diambil.',
@@ -30,8 +68,18 @@ class PenilaianController extends Controller
         ]);
     }
 
+    // Membuat penilaian baru
     public function store(Request $request)
     {
+        $user = $request->user();
+
+        // Hanya User yang dapat membuat penilaian
+        if ($user->role_id != 1) {
+            return response()->json([
+                'message' => 'Hanya User yang dapat membuat penilaian.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'monitoring_id' => [
                 'required',
@@ -45,6 +93,17 @@ class PenilaianController extends Controller
             'nilai_bangunan_per_m2' => 'required|numeric|min:0',
         ]);
 
+        // Pastikan monitoring milik User yang login
+        $monitoring = Monitoring::where('user_id', $user->id)
+            ->findOrFail($validated['monitoring_id']);
+
+        // Penilaian hanya dapat dibuat ketika masih DRAFT
+        if ($monitoring->status !== 'DRAFT') {
+            return response()->json([
+                'message' => 'Penilaian hanya dapat dibuat pada monitoring berstatus DRAFT.'
+            ], 422);
+        }
+
         $nilaiTotalTanah =
             $validated['luas_tanah'] *
             $validated['nilai_tanah_per_m2'];
@@ -54,7 +113,7 @@ class PenilaianController extends Controller
             $validated['nilai_bangunan_per_m2'];
 
         $penilaian = Penilaian::create([
-            'monitoring_id' => $validated['monitoring_id'],
+            'monitoring_id' => $monitoring->id,
             'luas_tanah' => $validated['luas_tanah'],
             'luas_bangunan' => $validated['luas_bangunan'],
             'nilai_tanah_per_m2' => $validated['nilai_tanah_per_m2'],
