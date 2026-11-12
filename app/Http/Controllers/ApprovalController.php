@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Approval;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ApprovalController extends Controller
 {
@@ -60,7 +61,6 @@ class ApprovalController extends Controller
         ]);
     }
     
-    // Menyetujui pengajuan monitoring
     public function approve(Request $request, $id)
     {
         $user = $request->user();
@@ -75,37 +75,39 @@ class ApprovalController extends Controller
             'catatan' => 'nullable|string|max:1000',
         ]);
 
-        $approval = \App\Models\Approval::with('monitoring')
-            ->findOrFail($id);
+        $approval = DB::transaction(function () use ($id, $user, $validated) {
 
-        if ($approval->status !== 'MENUNGGU') {
-            return response()->json([
-                'message' => 'Pengajuan ini sudah diproses.',
-            ], 422);
-        }
+            $approval = Approval::with('monitoring')
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        $monitoring = $approval->monitoring;
+            if ($approval->status !== 'MENUNGGU') {
+                abort(422, 'Pengajuan ini sudah diproses.');
+            }
 
-        if ($monitoring->status !== 'DIAJUKAN') {
-            return response()->json([
-                'message' => 'Monitoring tidak dalam status DIAJUKAN.',
-            ], 422);
-        }
+            $monitoring = $approval->monitoring;
 
-        $approval->update([
-            'approval_by' => $user->id,
-            'status' => 'DISETUJUI',
-            'catatan' => $validated['catatan'] ?? null,
-            'tanggal_approval' => now(),
-        ]);
+            if ($monitoring->status !== 'DIAJUKAN') {
+                abort(422, 'Monitoring tidak dalam status DIAJUKAN.');
+            }
 
-        $monitoring->update([
-            'status' => 'DISETUJUI',
-        ]);
+            $approval->update([
+                'approval_by' => $user->id,
+                'status' => 'DISETUJUI',
+                'catatan' => $validated['catatan'] ?? null,
+                'tanggal_approval' => now(),
+            ]);
+
+            $monitoring->update([
+                'status' => 'DISETUJUI',
+            ]);
+
+            return $approval->load('monitoring');
+        });
 
         return response()->json([
             'message' => 'Pengajuan berhasil disetujui.',
-            'data' => $approval->load('monitoring'),
+            'data' => $approval,
         ]);
     }
 
@@ -124,37 +126,39 @@ class ApprovalController extends Controller
             'catatan' => 'required|string|max:1000',
         ]);
 
-        $approval = \App\Models\Approval::with('monitoring')
-            ->findOrFail($id);
+        $approval = DB::transaction(function () use ($id, $user, $validated) {
 
-        if ($approval->status !== 'MENUNGGU') {
-            return response()->json([
-                'message' => 'Pengajuan ini sudah diproses.',
-            ], 422);
-        }
+            $approval = Approval::with('monitoring')
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        $monitoring = $approval->monitoring;
+            if ($approval->status !== 'MENUNGGU') {
+                abort(422, 'Pengajuan ini sudah diproses.');
+            }
 
-        if ($monitoring->status !== 'DIAJUKAN') {
-            return response()->json([
-                'message' => 'Monitoring tidak dalam status DIAJUKAN.',
-            ], 422);
-        }
+            $monitoring = $approval->monitoring;
 
-        $approval->update([
-            'approval_by' => $user->id,
-            'status' => 'DITOLAK',
-            'catatan' => $validated['catatan'],
-            'tanggal_approval' => now(),
-        ]);
+            if ($monitoring->status !== 'DIAJUKAN') {
+                abort(422, 'Monitoring tidak dalam status DIAJUKAN.');
+            }
 
-        $monitoring->update([
-            'status' => 'DITOLAK',
-        ]);
+            $approval->update([
+                'approval_by' => $user->id,
+                'status' => 'DITOLAK',
+                'catatan' => $validated['catatan'],
+                'tanggal_approval' => now(),
+            ]);
+
+            $monitoring->update([
+                'status' => 'DITOLAK',
+            ]);
+
+            return $approval->load('monitoring');
+        });
 
         return response()->json([
             'message' => 'Pengajuan berhasil ditolak.',
-            'data' => $approval->load('monitoring'),
+            'data' => $approval,
         ]);
     }
 
