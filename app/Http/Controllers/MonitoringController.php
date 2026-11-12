@@ -9,32 +9,67 @@ use Illuminate\Http\Request;
 
 class MonitoringController extends Controller
 {
-    // Menampilkan daftar monitoring milik pengguna yang login
+    // Menampilkan daftar monitoring sesuai role
     public function index(Request $request)
     {
-        $monitorings = Monitoring::with(['unit.blok.perumahan', 'penilaian', 'fotoMonitoring'])
-            ->where('user_id', $request->user()->id)
-            ->latest()
-            ->get();
+        $user = $request->user();
+
+        // Hanya User dan Super Admin yang dapat mengakses
+        if (!in_array((int) $user->role_id, [1, 3])) {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses untuk melihat daftar monitoring.',
+            ], 403);
+        }
+
+        $query = Monitoring::with([
+            'unit.blok.perumahan',
+            'penilaian',
+            'fotoMonitoring',
+        ]);
+
+        // User hanya melihat monitoring miliknya
+        if ((int) $user->role_id === 1) {
+            $query->where('user_id', $user->id);
+        }
+
+        $monitorings = $query->latest()->get();
 
         return response()->json([
             'message' => 'Daftar monitoring berhasil diambil.',
             'data' => $monitorings,
         ]);
     }
-
-    // Menampilkan detail satu monitoring
+    // Menampilkan detail monitoring sesuai role
     public function show(Request $request, $id)
     {
-        $monitoring = Monitoring::with(['unit.blok.perumahan', 'penilaian', 'fotoMonitoring'])
-            ->where('user_id', $request->user()->id)
-            ->findOrFail($id);
+        $user = $request->user();
+
+        // Hanya User dan Super Admin yang dapat mengakses
+        if (!in_array((int) $user->role_id, [1, 3])) {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses untuk melihat detail monitoring.',
+            ], 403);
+        }
+
+        $query = Monitoring::with([
+            'unit.blok.perumahan',
+            'penilaian',
+            'fotoMonitoring',
+        ]);
+
+        // User hanya dapat melihat monitoring miliknya
+        if ((int) $user->role_id === 1) {
+            $query->where('user_id', $user->id);
+        }
+
+        $monitoring = $query->findOrFail($id);
 
         return response()->json([
             'message' => 'Detail monitoring berhasil diambil.',
             'data' => $monitoring,
         ]);
     }
+
 
     // Membuat monitoring baru
     public function store(Request $request)

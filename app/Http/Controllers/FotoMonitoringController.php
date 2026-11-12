@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Monitoring;
-use App\Models\FotoMonitoring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,10 +11,30 @@ class FotoMonitoringController extends Controller
     // Mengambil daftar foto monitoring
     public function index(Request $request, $id)
     {
-        $monitoring = Monitoring::where(
-            'user_id',
-            $request->user()->id
-        )->findOrFail($id);
+        $user = $request->user();
+
+        // User hanya dapat melihat foto miliknya
+        if ($user->role_id == 1) {
+            $monitoring = Monitoring::where('user_id', $user->id)
+                ->findOrFail($id);
+        }
+
+        // Approval hanya dapat melihat foto pengajuan
+        elseif ($user->role_id == 2) {
+            $monitoring = Monitoring::where('status', 'DIAJUKAN')
+                ->findOrFail($id);
+        }
+
+        // Super Admin dapat melihat semua foto
+        elseif ($user->role_id == 3) {
+            $monitoring = Monitoring::findOrFail($id);
+        }
+
+        else {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses.'
+            ], 403);
+        }
 
         return response()->json([
             'message' => 'Daftar foto berhasil diambil.',
@@ -26,10 +45,24 @@ class FotoMonitoringController extends Controller
     // Mengunggah foto monitoring
     public function store(Request $request, $id)
     {
-        $monitoring = Monitoring::where(
-            'user_id',
-            $request->user()->id
-        )->findOrFail($id);
+        $user = $request->user();
+
+        // Hanya User yang boleh mengunggah foto
+        if ($user->role_id != 1) {
+            return response()->json([
+                'message' => 'Hanya User yang dapat mengunggah foto monitoring.'
+            ], 403);
+        }
+
+        $monitoring = Monitoring::where('user_id', $user->id)
+            ->findOrFail($id);
+
+        // Foto hanya boleh ditambahkan saat DRAFT
+        if ($monitoring->status != 'DRAFT') {
+            return response()->json([
+                'message' => 'Foto hanya dapat ditambahkan pada monitoring berstatus DRAFT.'
+            ], 422);
+        }
 
         $validated = $request->validate([
             'foto' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
