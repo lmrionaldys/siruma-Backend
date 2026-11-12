@@ -22,6 +22,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/perumahan', [PerumahanController::class, 'index']);
     Route::get('/perumahan/{id}', [PerumahanController::class, 'show']);
     Route::get('/perumahan/{id}/blok', [PerumahanController::class, 'blok']);
+    Route::post('/perumahan', [PerumahanController::class, 'store']);
+    Route::put('/perumahan/{id}', [PerumahanController::class, 'update']);
+    Route::delete('/perumahan/{id}', [PerumahanController::class, 'destroy']);
     Route::get('/blok/{id}/unit', [BlokController::class, 'unit']);
     Route::get('/monitoring', [MonitoringController::class, 'index']);
     Route::get('/monitoring/{id}', [MonitoringController::class, 'show']);
