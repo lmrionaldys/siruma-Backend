@@ -9,6 +9,7 @@ use App\Http\Controllers\PenilaianController;
 use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\FotoMonitoringController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\UnitController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -35,7 +36,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/blok/{id}', [BlokController::class, 'show']);
     Route::put('/blok/{id}', [BlokController::class, 'update']);
     Route::delete('/blok/{id}', [BlokController::class, 'destroy']);
-    Route::get('/blok/{id}/unit', [BlokController::class, 'unit']);
+
+    // UNIT
+    Route::get('/blok/{blokId}/unit', [UnitController::class, 'index']);
+    Route::post('/blok/{blokId}/unit', [UnitController::class, 'store']);
+    Route::get('/unit/{id}', [UnitController::class, 'show']);
+    Route::put('/unit/{id}', [UnitController::class, 'update']);
+    Route::delete('/unit/{id}', [UnitController::class, 'destroy']);
 
     // MONITORING
     Route::get('/monitoring', [MonitoringController::class, 'index']);
