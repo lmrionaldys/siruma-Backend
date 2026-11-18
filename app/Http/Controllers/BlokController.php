@@ -4,13 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Blok;
 use App\Models\Perumahan;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BlokController extends Controller
 {
+    public function __construct(
+        private AuditLogService $auditLogService
+    ) {}
+
     private function cekSuperAdmin(Request $request)
     {
-        if ($request->user()->role_id !== 3) {
+        if ((int) $request->user()->role_id !== 3) {
             return response()->json([
                 'message' => 'Akses hanya untuk Super Admin.',
             ], 403);
@@ -50,16 +56,32 @@ class BlokController extends Controller
             return $response;
         }
 
-        Perumahan::findOrFail($perumahanId);
+        $perumahan = Perumahan::findOrFail($perumahanId);
 
         $validated = $request->validate([
             'nama_blok' => 'required|string|max:255',
         ]);
 
-        $blok = Blok::create([
-            'perumahan_id' => $perumahanId,
-            'nama_blok' => $validated['nama_blok'],
-        ]);
+        $blok = DB::transaction(function () use (
+            $validated,
+            $perumahan,
+            $request
+        ) {
+            $blok = Blok::create([
+                'perumahan_id' => $perumahan->id,
+                'nama_blok' => $validated['nama_blok'],
+            ]);
+
+            $this->auditLogService->catat(
+                (int) $request->user()->id,
+                'Tambah Blok',
+                'blok',
+                (int) $blok->id,
+                'Menambahkan blok: ' . $blok->nama_blok
+            );
+
+            return $blok;
+        });
 
         return response()->json([
             'message' => 'Blok berhasil ditambahkan.',
@@ -80,7 +102,29 @@ class BlokController extends Controller
             'nama_blok' => 'sometimes|required|string|max:255',
         ]);
 
-        $blok->update($validated);
+        if (empty($validated)) {
+            return response()->json([
+                'message' => 'Tidak ada data yang dikirim untuk diperbarui.',
+            ], 422);
+        }
+
+        $blok = DB::transaction(function () use (
+            $blok,
+            $validated,
+            $request
+        ) {
+            $blok->update($validated);
+
+            $this->auditLogService->catat(
+                (int) $request->user()->id,
+                'Edit Blok',
+                'blok',
+                (int) $blok->id,
+                'Memperbarui nama blok: ' . $blok->nama_blok
+            );
+
+            return $blok->fresh();
+        });
 
         return response()->json([
             'message' => 'Blok berhasil diperbarui.',
@@ -103,7 +147,20 @@ class BlokController extends Controller
             ], 422);
         }
 
-        $blok->delete();
+        DB::transaction(function () use ($blok, $request) {
+            $namaBlok = $blok->nama_blok;
+            $blokId = (int) $blok->id;
+
+            $blok->delete();
+
+            $this->auditLogService->catat(
+                (int) $request->user()->id,
+                'Hapus Blok',
+                'blok',
+                $blokId,
+                'Menghapus blok: ' . $namaBlok
+            );
+        });
 
         return response()->json([
             'message' => 'Blok berhasil dihapus.',

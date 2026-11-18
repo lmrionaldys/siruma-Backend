@@ -42,7 +42,7 @@ class AuthController extends Controller
                 'nama' => $user->nama ?? $user->name,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
-                'role' => $user->role?->name,
+                'role' => $user->role?->nama_role,
             ],
         ]);
     }

@@ -3,14 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\Perumahan;
+use App\Services\AuditLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PerumahanController extends Controller
 {
+    public function __construct(
+        private AuditLogService $auditLogService
+    ) {}
+
     // Memeriksa akses Super Admin
     private function cekSuperAdmin(Request $request)
     {
-        if ($request->user()->role_id !== 3) {
+        if ((int) $request->user()->role_id !== 3) {
             return response()->json([
                 'message' => 'Akses hanya untuk Super Admin.',
             ], 403);
@@ -66,7 +72,19 @@ class PerumahanController extends Controller
             'status' => 'sometimes|in:aktif,nonaktif',
         ]);
 
-        $perumahan = Perumahan::create($validated);
+        $perumahan = DB::transaction(function () use ($request, $validated) {
+            $perumahan = Perumahan::create($validated);
+
+            $this->auditLogService->catat(
+                $request->user()->id,
+                'Tambah Perumahan',
+                'perumahan',
+                $perumahan->id,
+                'Menambahkan perumahan: ' . $perumahan->nama_perumahan
+            );
+
+            return $perumahan;
+        });
 
         return response()->json([
             'message' => 'Perumahan berhasil ditambahkan.',
@@ -90,11 +108,27 @@ class PerumahanController extends Controller
             'status' => 'sometimes|in:aktif,nonaktif',
         ]);
 
-        $perumahan->update($validated);
+        if (empty($validated)) {
+            return response()->json([
+                'message' => 'Tidak ada data yang dikirim untuk diperbarui.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($request, $perumahan, $validated) {
+            $perumahan->update($validated);
+
+            $this->auditLogService->catat(
+                $request->user()->id,
+                'Edit Perumahan',
+                'perumahan',
+                $perumahan->id,
+                'Memperbarui data perumahan: ' . $perumahan->nama_perumahan
+            );
+        });
 
         return response()->json([
             'message' => 'Perumahan berhasil diperbarui.',
-            'data' => $perumahan,
+            'data' => $perumahan->fresh(),
         ]);
     }
 
@@ -113,7 +147,20 @@ class PerumahanController extends Controller
             ], 422);
         }
 
-        $perumahan->delete();
+        DB::transaction(function () use ($request, $perumahan) {
+            $namaPerumahan = $perumahan->nama_perumahan;
+            $perumahanId = $perumahan->id;
+
+            $perumahan->delete();
+
+            $this->auditLogService->catat(
+                $request->user()->id,
+                'Hapus Perumahan',
+                'perumahan',
+                $perumahanId,
+                'Menghapus perumahan: ' . $namaPerumahan
+            );
+        });
 
         return response()->json([
             'message' => 'Perumahan berhasil dihapus.',
